@@ -82,7 +82,7 @@ public class DefaultJvmSoftwareComponent extends DefaultAdhocSoftwareComponent i
 
         Configuration javadocElements = mainFeature.getJavadocElementsConfiguration();
         if (!isRegisteredAsLegacyVariant(javadocElements)) {
-            addVariantsFromConfiguration(javadocElements, new JavaConfigurationVariantMapping("runtime", true));
+            addVariantsFromConfiguration(javadocElements, new JavaConfigurationVariantMapping("runtime", true, null));
         }
     }
 
@@ -92,7 +92,7 @@ public class DefaultJvmSoftwareComponent extends DefaultAdhocSoftwareComponent i
 
         Configuration sourcesElements = mainFeature.getSourcesElementsConfiguration();
         if (!isRegisteredAsLegacyVariant(sourcesElements)) {
-            addVariantsFromConfiguration(sourcesElements, new JavaConfigurationVariantMapping("runtime", true));
+            addVariantsFromConfiguration(sourcesElements, new JavaConfigurationVariantMapping("runtime", true, null));
         }
     }
 
@@ -107,8 +107,8 @@ public class DefaultJvmSoftwareComponent extends DefaultAdhocSoftwareComponent i
                                   ProviderFactory providerFactory,
                                   JvmPluginServices jvmPluginServices) {
         // Register the consumable configurations as providing variants for consumption.
-        addVariantsFromConfiguration(feature.getApiElementsConfiguration(), new JavaConfigurationVariantMapping("compile", false));
-        addVariantsFromConfiguration(feature.getRuntimeElementsConfiguration(), new JavaConfigurationVariantMapping("runtime", false));
+        addVariantsFromConfiguration(feature.getApiElementsConfiguration(), new JavaConfigurationVariantMapping("compile", false, feature.getCompileClasspathConfiguration()));
+        addVariantsFromConfiguration(feature.getRuntimeElementsConfiguration(), new JavaConfigurationVariantMapping("runtime", false, feature.getRuntimeClasspathConfiguration()));
     }
 
     @Nullable
