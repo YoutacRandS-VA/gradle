@@ -136,7 +136,7 @@ public class DefaultImmutableWorkspaceProvider implements WorkspaceProvider, Clo
     ) {
         PersistentCache cache = cacheBuilder
             .withCleanupStrategy(createCacheCleanupStrategy(fileAccessTimeJournal, treeDepthToTrackAndCleanup, cacheConfigurations))
-            .withLockOptions(mode(OnDemandShared).useCrossVersionImplementation())
+            .withLockOptions(mode(OnDemandShared))
             .open();
         this.fileLockManager = fileLockManager;
         this.cache = cache;
