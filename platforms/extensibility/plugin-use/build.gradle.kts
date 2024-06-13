@@ -9,20 +9,24 @@ errorprone {
 }
 
 dependencies {
-    implementation(project(":base-services"))
-    implementation(project(":logging"))
-    implementation(project(":messaging"))
-    implementation(project(":file-collections"))
-    implementation(project(":core-api"))
-    implementation(project(":core"))
-    implementation(project(":core-jvm"))
-    implementation(project(":dependency-management"))
-    implementation(project(":build-option"))
-    implementation(project(":problems-api"))
+    api(projects.serviceProvider)
+    api(project(":base-services"))
+    api(project(":core-api"))
+    api(project(":core"))
+    api(project(":dependency-management"))
+    api(project(":file-collections"))
+    api(project(":stdlib-java-extensions"))
+    api(project(":logging"))
+    api(project(":messaging"))
+    api(project(":model-core"))
+
+    api(libs.guava)
+    api(libs.jsr305)
+
     implementation(project(":functional"))
 
-    implementation(libs.groovy)
-    implementation(libs.guava)
+    implementation(project(":jvm-services"))
+    implementation(project(":problems-api"))
 
     testImplementation(testFixtures(project(":resources-http")))
 

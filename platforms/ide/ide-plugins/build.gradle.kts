@@ -23,15 +23,12 @@ description = "Plugins that add support for generating IDE project files used fo
 errorprone {
     disabledChecks.addAll(
         "MixedMutabilityReturnType", // 2 occurrences
-        "ShortCircuitBoolean", // 2 occurrences
-        "UnnecessaryParentheses", // 1 occurrences
-        "UnusedMethod", // 2 occurrences
-        "UnusedVariable", // 1 occurrences
     )
 }
 
 dependencies {
-    api(project(":base-annotations"))
+    api(projects.stdlibJavaExtensions)
+    api(projects.serviceProvider)
     api(project(":base-ide-plugins"))
     api(project(":base-services"))
     api(project(":core"))
@@ -62,7 +59,6 @@ dependencies {
     implementation(libs.commonsLang)
 
     runtimeOnly(project(":language-jvm"))
-    runtimeOnly(project(":plugins"))
     runtimeOnly(project(":testing-base"))
 
     testImplementation(testFixtures(project(":core")))
@@ -102,3 +98,5 @@ packageCycles {
      canHandleCi.cies/xinjd/.classpath
  */
 testFilesCleanup.reportOnly = true
+
+integTest.usesJavadocCodeSnippets = true

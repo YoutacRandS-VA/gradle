@@ -28,9 +28,9 @@ import org.gradle.api.internal.initialization.transform.services.CacheInstrument
 import org.gradle.api.internal.provider.Providers;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.services.BuildServiceRegistry;
-import org.gradle.internal.agents.AgentStatus;
 import org.gradle.internal.id.IdGenerator;
 import org.gradle.internal.id.LongIdGenerator;
+import org.gradle.internal.instrumentation.agent.AgentStatus;
 import org.gradle.internal.lazy.Lazy;
 
 import static org.gradle.api.internal.initialization.DefaultScriptClassPathResolver.INSTRUMENTED_ATTRIBUTE;
@@ -85,7 +85,7 @@ public class InstrumentationTransformRegisterer {
                 spec.parameters(params -> {
                     params.getBuildService().set(service);
                     params.getContextId().set(contextId);
-                    params.getAnalysisResult().setFrom(service.map(it -> it.getAnalysisResult(contextId)));
+                    params.getTypeHierarchyAnalysis().setFrom(service.map(it -> it.getTypeHierarchyAnalysis(contextId)));
                 });
             }
         );

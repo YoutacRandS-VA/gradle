@@ -17,6 +17,8 @@ dependencies {
     api(libs.bouncycastlePgp)
     api(libs.jsr305)
 
+    implementation(projects.stdlibJavaExtensions)
+    implementation(projects.time)
     implementation(project(":base-services"))
     implementation(project(":functional"))
     implementation(project(":logging-api"))

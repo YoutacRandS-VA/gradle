@@ -12,7 +12,8 @@ errorprone {
 }
 
 dependencies {
-    api(project(":base-annotations"))
+    api(projects.stdlibJavaExtensions)
+    api(projects.serviceProvider)
     api(project(":base-services"))
     api(project(":core"))
     api(project(":core-api"))
@@ -26,7 +27,6 @@ dependencies {
     api(libs.jsr305)
     api(libs.nativePlatform)
 
-    implementation(project(":core-jvm"))
     implementation(project(":dependency-management"))
     implementation(project(":execution"))
     implementation(project(":functional"))

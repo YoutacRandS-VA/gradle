@@ -23,11 +23,14 @@ import org.gradle.api.internal.initialization.ClassLoaderScope
 import org.gradle.api.internal.initialization.ScriptHandlerInternal
 import org.gradle.api.internal.plugins.PluginAwareInternal
 import org.gradle.api.internal.project.ProjectInternal
+import org.gradle.api.plugins.ExtensionAware
 import org.gradle.cache.CacheOpenException
 import org.gradle.groovy.scripts.ScriptSource
 import org.gradle.groovy.scripts.internal.ScriptSourceHasher
 import org.gradle.initialization.ClassLoaderScopeOrigin
 import org.gradle.initialization.GradlePropertiesController
+import org.gradle.internal.buildoption.InternalFlag
+import org.gradle.internal.buildoption.InternalOptions
 import org.gradle.internal.classloader.ClasspathHasher
 import org.gradle.internal.classpath.CachedClasspathTransformer
 import org.gradle.internal.classpath.ClassPath
@@ -36,6 +39,9 @@ import org.gradle.internal.classpath.transforms.ClasspathElementTransformFactory
 import org.gradle.internal.execution.ExecutionEngine
 import org.gradle.internal.execution.InputFingerprinter
 import org.gradle.internal.execution.UnitOfWork
+import org.gradle.internal.execution.caching.CachingDisabledReason
+import org.gradle.internal.execution.caching.CachingDisabledReasonCategory
+import org.gradle.internal.execution.history.OverlappingOutputs
 import org.gradle.internal.hash.HashCode
 import org.gradle.internal.logging.progress.ProgressLoggerFactory
 import org.gradle.internal.operations.BuildOperationContext
@@ -46,7 +52,6 @@ import org.gradle.internal.scripts.BuildScriptCompilationAndInstrumentation
 import org.gradle.internal.scripts.CompileScriptBuildOperationType.Details
 import org.gradle.internal.scripts.CompileScriptBuildOperationType.Result
 import org.gradle.internal.scripts.ScriptExecutionListener
-import org.gradle.kotlin.dsl.accessors.ProjectAccessorsClassPathGenerator
 import org.gradle.kotlin.dsl.accessors.Stage1BlocksAccessorClassPathGenerator
 import org.gradle.kotlin.dsl.cache.KotlinDslWorkspaceProvider
 import org.gradle.kotlin.dsl.execution.CompiledScript
@@ -64,6 +69,7 @@ import org.gradle.kotlin.dsl.support.serviceOf
 import org.gradle.plugin.management.internal.PluginRequests
 import org.gradle.plugin.use.internal.PluginRequestApplicator
 import java.io.File
+import java.util.Optional
 
 
 interface KotlinScriptEvaluator {
@@ -100,6 +106,7 @@ class StandardKotlinScriptEvaluator(
     private val workspaceProvider: KotlinDslWorkspaceProvider,
     private val fileCollectionFactory: FileCollectionFactory,
     private val inputFingerprinter: InputFingerprinter,
+    private val internalOptions: InternalOptions,
     private val gradlePropertiesController: GradlePropertiesController,
     private val transformFactoryForLegacy: ClasspathElementTransformFactoryForLegacy
 ) : KotlinScriptEvaluator {
@@ -156,19 +163,20 @@ class StandardKotlinScriptEvaluator(
             kotlinCompilerOptions(gradleProperties)
 
         override fun stage1BlocksAccessorsFor(scriptHost: KotlinScriptHost<*>): ClassPath =
-            (scriptHost.target as? ProjectInternal)?.let {
-                val stage1BlocksAccessorClassPathGenerator = it.serviceOf<Stage1BlocksAccessorClassPathGenerator>()
-                stage1BlocksAccessorClassPathGenerator.stage1BlocksAccessorClassPath(it).bin
-            } ?: ClassPath.EMPTY
+            (scriptHost.target as? ProjectInternal)
+                ?.let {
+                    val stage1BlocksAccessorClassPathGenerator = it.serviceOf<Stage1BlocksAccessorClassPathGenerator>()
+                    stage1BlocksAccessorClassPathGenerator.stage1BlocksAccessorClassPath(it).bin
+                } ?: ClassPath.EMPTY
 
-        override fun accessorsClassPathFor(scriptHost: KotlinScriptHost<*>): ClassPath {
-            val project = scriptHost.target as Project
-            val projectAccessorsClassPathGenerator = project.serviceOf<ProjectAccessorsClassPathGenerator>()
-            return projectAccessorsClassPathGenerator.projectAccessorsClassPath(
-                project,
-                compilationClassPathOf(scriptHost.targetScope)
-            ).bin
-        }
+        override fun accessorsClassPathFor(scriptHost: KotlinScriptHost<*>): ClassPath =
+            (scriptHost.target as? ExtensionAware)
+                ?.let { scriptTarget ->
+                    scriptHost.projectAccessorsClassPathGenerator.projectAccessorsClassPath(
+                        scriptTarget,
+                        compilationClassPathOf(scriptHost.targetScope)
+                    ).bin
+                } ?: ClassPath.EMPTY
 
         override fun runCompileBuildOperation(scriptPath: String, stage: String, action: () -> String): String =
 
@@ -263,6 +271,7 @@ class StandardKotlinScriptEvaluator(
                         workspaceProvider,
                         fileCollectionFactory,
                         inputFingerprinter,
+                        internalOptions,
                         transformFactoryForLegacy
                     )
                 )
@@ -353,7 +362,10 @@ class StandardKotlinScriptEvaluator(
         workspaceProvider: KotlinDslWorkspaceProvider,
         fileCollectionFactory: FileCollectionFactory,
         inputFingerprinter: InputFingerprinter,
-        transformFactory: ClasspathElementTransformFactoryForLegacy
+        internalOptions: InternalOptions,
+        transformFactory: ClasspathElementTransformFactoryForLegacy,
+        private val cachingDisabledByProperty: Boolean = internalOptions.getOption(CACHING_DISABLED_PROPERTY).get()
+
     ) : BuildScriptCompilationAndInstrumentation(workspaceProvider.scripts, fileCollectionFactory, inputFingerprinter, transformFactory) {
 
         companion object {
@@ -364,10 +376,21 @@ class StandardKotlinScriptEvaluator(
             const val SOURCE_HASH = "sourceHash"
             const val COMPILATION_CLASS_PATH = "compilationClassPath"
             const val ACCESSORS_CLASS_PATH = "accessorsClassPath"
+            val CACHING_DISABLED_PROPERTY: InternalFlag = InternalFlag("org.gradle.internal.kotlin-script-caching-disabled")
+            val CACHING_DISABLED_REASON: CachingDisabledReason = CachingDisabledReason(CachingDisabledReasonCategory.NOT_CACHEABLE, "Caching of Kotlin script compilation disabled by property")
         }
 
         override fun getDisplayName(): String =
             "Kotlin DSL script compilation (${programId.templateId})"
+
+
+        override fun shouldDisableCaching(detectedOverlappingOutputs: OverlappingOutputs?): Optional<CachingDisabledReason> {
+            if (cachingDisabledByProperty) {
+                return Optional.of(CACHING_DISABLED_REASON)
+            }
+
+            return super.shouldDisableCaching(detectedOverlappingOutputs)
+        }
 
         override fun visitIdentityInputs(visitor: UnitOfWork.InputVisitor) {
             visitor.visitInputProperty(JVM_TARGET) { programId.compilerOptions.jvmTarget.majorVersion }

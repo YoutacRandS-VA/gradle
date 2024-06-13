@@ -17,7 +17,7 @@ package org.gradle.api.internal.artifacts.ivyservice;
 
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.FileCollectionDependency;
-import org.gradle.api.artifacts.ResolveException;
+import org.gradle.api.artifacts.LenientConfiguration;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.artifacts.UnresolvedDependency;
@@ -44,9 +44,9 @@ import org.gradle.api.internal.file.FileCollectionInternal;
 import org.gradle.api.internal.file.FileCollectionStructureVisitor;
 import org.gradle.api.internal.tasks.TaskDependencyResolveContext;
 import org.gradle.api.specs.Spec;
-import org.gradle.api.specs.Specs;
 import org.gradle.internal.DisplayName;
 import org.gradle.internal.component.external.model.ImmutableCapabilities;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.graph.CachingDirectedGraphWalker;
 import org.gradle.internal.graph.DirectedGraphWithEdgeValues;
 
@@ -140,11 +140,22 @@ public class DefaultLenientConfiguration implements LenientConfigurationInternal
 
     @Override
     public Set<ResolvedDependency> getFirstLevelModuleDependencies() {
-        return getFirstLevelModuleDependencies(Specs.SATISFIES_ALL);
+        Set<ResolvedDependency> matches = new LinkedHashSet<>();
+        for (DependencyGraphNodeResult node : loadTransientGraphResults(getSelectedArtifacts()).getFirstLevelDependencies().values()) {
+            matches.add(node.getPublicView());
+        }
+        return matches;
     }
 
     @Override
+    @Deprecated
     public Set<ResolvedDependency> getFirstLevelModuleDependencies(Spec<? super Dependency> dependencySpec) {
+        DeprecationLogger.deprecateMethod(LenientConfiguration.class, "getFirstLevelModuleDependencies(Spec)")
+            .withAdvice("Use getFirstLevelModuleDependencies() instead.")
+            .willBeRemovedInGradle9()
+            .withUpgradeGuideSection(8, "deprecate_filtered_configuration_file_and_filecollection_methods")
+            .nagUser();
+
         Set<ResolvedDependency> matches = new LinkedHashSet<>();
         for (DependencyGraphNodeResult node : getFirstLevelNodes(dependencySpec)) {
             matches.add(node.getPublicView());
@@ -186,7 +197,14 @@ public class DefaultLenientConfiguration implements LenientConfigurationInternal
     }
 
     @Override
+    @Deprecated
     public Set<File> getFiles(Spec<? super Dependency> dependencySpec) {
+        DeprecationLogger.deprecateMethod(LenientConfiguration.class, "getFiles(Spec)")
+            .withAdvice("Use a lenient ArtifactView with a componentFilter instead.")
+            .willBeRemovedInGradle9()
+            .withUpgradeGuideSection(8, "deprecate_filtered_configuration_file_and_filecollection_methods")
+            .nagUser();
+
         LenientFilesAndArtifactResolveVisitor visitor = new LenientFilesAndArtifactResolveVisitor();
         ResolvedArtifactSet filteredArtifacts = resolveFilteredArtifacts(dependencySpec, getSelectedArtifacts());
         artifactSetResolver.visitArtifacts(filteredArtifacts, visitor, resolutionHost);
@@ -203,7 +221,14 @@ public class DefaultLenientConfiguration implements LenientConfigurationInternal
     }
 
     @Override
+    @Deprecated
     public Set<ResolvedArtifact> getArtifacts(Spec<? super Dependency> dependencySpec) {
+        DeprecationLogger.deprecateMethod(LenientConfiguration.class, "getArtifacts(Spec)")
+            .withAdvice("Use a lenient ArtifactView with a componentFilter instead.")
+            .willBeRemovedInGradle9()
+            .withUpgradeGuideSection(8, "deprecate_filtered_configuration_file_and_filecollection_methods")
+            .nagUser();
+
         LenientArtifactCollectingVisitor visitor = new LenientArtifactCollectingVisitor();
         ResolvedArtifactSet filteredArtifacts = resolveFilteredArtifacts(dependencySpec, getSelectedArtifacts());
         artifactSetResolver.visitArtifacts(filteredArtifacts, visitor, resolutionHost);
@@ -279,23 +304,6 @@ public class DefaultLenientConfiguration implements LenientConfigurationInternal
         @Override
         public FileCollectionStructureVisitor.VisitType prepareForVisit(FileCollectionInternal.Source source) {
             return FileCollectionStructureVisitor.VisitType.Visit;
-        }
-    }
-
-    public static class ArtifactResolveException extends ResolveException {
-        private final String type;
-        private final String displayName;
-
-        public ArtifactResolveException(String type, String displayName, Iterable<? extends Throwable> failures) {
-            super(displayName, failures);
-            this.type = type;
-            this.displayName = displayName;
-        }
-
-        // Need to override as error message is hardcoded in constructor of public type ResolveException
-        @Override
-        public String getMessage() {
-            return String.format("Could not resolve all %s for %s.", type, displayName);
         }
     }
 

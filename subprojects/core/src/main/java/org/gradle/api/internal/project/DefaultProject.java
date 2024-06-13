@@ -23,7 +23,6 @@ import org.gradle.api.AntBuilder;
 import org.gradle.api.CircularReferenceException;
 import org.gradle.api.InvalidUserCodeException;
 import org.gradle.api.InvalidUserDataException;
-import org.gradle.api.IsolatedProject;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.NamedDomainObjectFactory;
 import org.gradle.api.PathValidation;
@@ -75,6 +74,7 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionContainer;
+import org.gradle.api.project.IsolatedProject;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
@@ -104,6 +104,8 @@ import org.gradle.internal.model.RuleBasedPluginListener;
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.resource.TextUriResourceLoader;
 import org.gradle.internal.service.DefaultServiceRegistry;
+import org.gradle.internal.service.Provides;
+import org.gradle.internal.service.ServiceRegistrationProvider;
 import org.gradle.internal.service.ServiceRegistry;
 import org.gradle.internal.service.scopes.ServiceRegistryFactory;
 import org.gradle.internal.typeconversion.TypeConverter;
@@ -146,7 +148,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.util.Collections.singletonMap;
@@ -191,10 +192,6 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     private final ProjectStateInternal state;
 
-    private FileResolver fileResolver;
-
-    private TaskDependencyFactory taskDependencyFactory;
-
     private Factory<AntBuilder> antBuilderFactory;
 
     private AntBuilder ant;
@@ -202,12 +199,6 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     private final int depth;
 
     private final TaskContainerInternal taskContainer;
-
-    private DependencyHandler dependencyHandler;
-
-    private RoleBasedConfigurationContainerInternal configurationContainer;
-
-    private ArtifactHandler artifactHandler;
 
     private ListenerBroadcast<ProjectEvaluationListener> evaluationListener = newProjectEvaluationListenerBroadcast();
 
@@ -519,12 +510,7 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     @Override
     public Map<String, Project> getChildProjects() {
-        return getChildProjectsUnchecked().entrySet().stream().collect(
-            Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> getCrossProjectModelAccess().access(this, (ProjectInternal) entry.getValue())
-            )
-        );
+        return getCrossProjectModelAccess().getChildProjects(this, this);
     }
 
     @Override
@@ -542,49 +528,29 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         return state;
     }
 
+    @Inject
     @Override
-    public FileResolver getFileResolver() {
-        if (fileResolver == null) {
-            fileResolver = services.get(FileResolver.class);
-        }
-        return fileResolver;
-    }
+    public abstract FileResolver getFileResolver();
 
+    @Inject
     @Override
-    public TaskDependencyFactory getTaskDependencyFactory() {
-        if (taskDependencyFactory == null) {
-            taskDependencyFactory = services.get(TaskDependencyFactory.class);
-        }
-        return taskDependencyFactory;
-    }
-
-    public void setFileResolver(FileResolver fileResolver) {
-        this.fileResolver = fileResolver;
-    }
+    public abstract TaskDependencyFactory getTaskDependencyFactory();
 
     public void setAnt(AntBuilder ant) {
         this.ant = ant;
     }
 
+    @Inject
     @Override
-    public ArtifactHandler getArtifacts() {
-        if (artifactHandler == null) {
-            artifactHandler = services.get(ArtifactHandler.class);
-        }
-        return artifactHandler;
-    }
+    public abstract ArtifactHandler getArtifacts();
 
     @Inject
     @Override
     public abstract RepositoryHandler getRepositories();
 
+    @Inject
     @Override
-    public RoleBasedConfigurationContainerInternal getConfigurations() {
-        if (configurationContainer == null) {
-            configurationContainer = services.get(RoleBasedConfigurationContainerInternal.class);
-        }
-        return configurationContainer;
-    }
+    public abstract RoleBasedConfigurationContainerInternal getConfigurations();
 
     @Deprecated
     @Override
@@ -596,7 +562,6 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     public String getPath() {
         return owner.getProjectPath().toString();
     }
-
 
     @Override
     public String getBuildTreePath() {
@@ -936,20 +901,20 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         return foundTasks;
     }
 
-    @Override
     @Inject
+    @Override
     public abstract FileOperations getFileOperations();
 
-    @Override
     @Inject
+    @Override
     public abstract ProviderFactory getProviders();
 
-    @Override
     @Inject
+    @Override
     public abstract ObjectFactory getObjects();
 
-    @Override
     @Inject
+    @Override
     public abstract DefaultProjectLayout getLayout();
 
     @Override
@@ -1053,16 +1018,12 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         return antBuilderFactory;
     }
 
-    @Override
-    public DependencyHandler getDependencies() {
-        if (dependencyHandler == null) {
-            dependencyHandler = services.get(DependencyHandler.class);
-        }
-        return dependencyHandler;
-    }
-
-    @Override
     @Inject
+    @Override
+    public abstract DependencyHandler getDependencies();
+
+    @Inject
+    @Override
     public abstract DependencyFactory getDependencyFactory();
 
     @Override
@@ -1211,8 +1172,8 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         return getFileOperations().copySpec();
     }
 
-    @Override
     @Inject
+    @Override
     public abstract ProcessOperations getProcessOperations();
 
     @Override
@@ -1245,8 +1206,8 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         return services.get(ServiceRegistryFactory.class);
     }
 
-    @Override
     @Inject
+    @Override
     public abstract DependencyMetaDataProvider getDependencyMetaDataProvider();
 
     @Override
@@ -1518,7 +1479,8 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         DependencyManagementServices dms = getServices().get(DependencyManagementServices.class);
         InstantiatorFactory instantiatorFactory = services.get(InstantiatorFactory.class);
         DefaultServiceRegistry lookup = new DefaultServiceRegistry(services);
-        lookup.addProvider(new Object() {
+        lookup.addProvider(new ServiceRegistrationProvider() {
+            @Provides
             public DependencyResolutionServices createServices() {
                 return dms.create(
                     services.get(FileResolver.class),

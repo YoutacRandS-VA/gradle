@@ -20,6 +20,7 @@ import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.BuildOperationTreeQueries
 import org.gradle.integtests.fixtures.BuildOperationsFixture
 import org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache
+import org.gradle.integtests.fixtures.ToBeFixedForIsolatedProjects
 import org.gradle.integtests.fixtures.daemon.DaemonLogsAnalyzer
 import org.gradle.integtests.fixtures.daemon.DaemonsFixture
 import org.gradle.internal.scripts.CompileScriptBuildOperationType
@@ -31,6 +32,8 @@ import org.junit.Rule
 import spock.lang.Issue
 
 import java.util.regex.Pattern
+
+import static org.gradle.integtests.fixtures.ToBeFixedForConfigurationCache.Skip.INVESTIGATE
 
 class CrossBuildScriptCachingIntegrationSpec extends AbstractIntegrationSpec {
 
@@ -218,6 +221,7 @@ class CrossBuildScriptCachingIntegrationSpec extends AbstractIntegrationSpec {
         outputContains 'Greetings from Two!'
     }
 
+    @ToBeFixedForIsolatedProjects(because = "Investigate")
     def "reports errors at the correct location when 2 scripts are identical"() {
         given:
         root {
@@ -505,6 +509,7 @@ class CrossBuildScriptCachingIntegrationSpec extends AbstractIntegrationSpec {
         getCompileBuildFileOperationsCount() == 8 // classpath and body for the common script + identical script x 3 targets
     }
 
+    @ToBeFixedForConfigurationCache(skip = INVESTIGATE)
     def "remapped classes have script origin"() {
         root {
             'build.gradle'('''

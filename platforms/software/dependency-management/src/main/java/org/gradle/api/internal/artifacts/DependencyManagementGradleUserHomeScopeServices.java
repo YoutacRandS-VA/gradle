@@ -20,6 +20,7 @@ import org.gradle.BuildAdapter;
 import org.gradle.BuildResult;
 import org.gradle.api.internal.DocumentationRegistry;
 import org.gradle.api.internal.artifacts.ivyservice.ArtifactCachesProvider;
+import org.gradle.api.internal.artifacts.ivyservice.CacheLayout;
 import org.gradle.api.internal.artifacts.ivyservice.DefaultArtifactCaches;
 import org.gradle.api.internal.artifacts.transform.ImmutableTransformWorkspaceServices;
 import org.gradle.api.internal.artifacts.transform.ToPlannedTransformStepConverter;
@@ -39,13 +40,17 @@ import org.gradle.internal.execution.UnitOfWork;
 import org.gradle.internal.execution.workspace.ImmutableWorkspaceProvider;
 import org.gradle.internal.execution.workspace.impl.CacheBasedImmutableWorkspaceProvider;
 import org.gradle.internal.file.FileAccessTimeJournal;
+import org.gradle.internal.service.Provides;
+import org.gradle.internal.service.ServiceRegistrationProvider;
 
-public class DependencyManagementGradleUserHomeScopeServices {
+public class DependencyManagementGradleUserHomeScopeServices implements ServiceRegistrationProvider {
 
+    @Provides
     ToPlannedNodeConverter createToPlannedTransformStepConverter() {
         return new ToPlannedTransformStepConverter();
     }
 
+    @Provides
     DefaultArtifactCaches.WritableArtifactCacheLockingParameters createWritableArtifactCacheLockingParameters(FileAccessTimeJournal fileAccessTimeJournal, UsedGradleVersions usedGradleVersions) {
         return new DefaultArtifactCaches.WritableArtifactCacheLockingParameters() {
             @Override
@@ -60,6 +65,7 @@ public class DependencyManagementGradleUserHomeScopeServices {
         };
     }
 
+    @Provides
     ArtifactCachesProvider createArtifactCaches(
         GlobalScopedCacheBuilderFactory cacheBuilderFactory,
         UnscopedCacheBuilderFactory unscopedCacheBuilderFactory,
@@ -81,15 +87,15 @@ public class DependencyManagementGradleUserHomeScopeServices {
         return artifactCachesProvider;
     }
 
+    @Provides
     ImmutableTransformWorkspaceServices createTransformWorkspaceServices(
-        ArtifactCachesProvider artifactCaches,
-        UnscopedCacheBuilderFactory unscopedCacheBuilderFactory,
+        GlobalScopedCacheBuilderFactory cacheBuilderFactory,
         CrossBuildInMemoryCacheFactory crossBuildInMemoryCacheFactory,
         FileAccessTimeJournal fileAccessTimeJournal,
         CacheConfigurationsInternal cacheConfigurations
     ) {
-        CacheBuilder cacheBuilder = unscopedCacheBuilderFactory
-            .cache(artifactCaches.getWritableCacheMetadata().getTransformsStoreDirectory())
+        CacheBuilder cacheBuilder = cacheBuilderFactory
+            .createCacheBuilder(CacheLayout.TRANSFORMS.getName())
             .withDisplayName("Artifact transforms cache");
         CrossBuildInMemoryCache<UnitOfWork.Identity, ExecutionEngine.IdentityCacheResult<TransformExecutionResult.TransformWorkspaceResult>> identityCache = crossBuildInMemoryCacheFactory.newCacheRetainingDataFromPreviousBuild(result -> result.getResult().isSuccessful());
         CacheBasedImmutableWorkspaceProvider workspaceProvider = CacheBasedImmutableWorkspaceProvider.createWorkspaceProvider(cacheBuilder, fileAccessTimeJournal, cacheConfigurations);

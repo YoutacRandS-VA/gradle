@@ -17,7 +17,7 @@
 package gradlebuild.performance
 
 import com.google.common.annotations.VisibleForTesting
-import com.gradle.enterprise.gradleplugin.testretry.TestRetryExtension
+import com.gradle.develocity.agent.gradle.test.DevelocityTestConfiguration
 import gradlebuild.basics.buildBranch
 import gradlebuild.basics.buildCommitId
 import gradlebuild.basics.capitalize
@@ -32,6 +32,7 @@ import gradlebuild.basics.propertiesForPerformanceDb
 import gradlebuild.basics.releasedVersionsFile
 import gradlebuild.basics.repoRoot
 import gradlebuild.basics.toLowerCase
+import gradlebuild.basics.toolchainInstallationPaths
 import gradlebuild.integrationtests.addDependenciesAndConfigurations
 import gradlebuild.integrationtests.ide.AndroidStudioProvisioningExtension
 import gradlebuild.integrationtests.ide.AndroidStudioProvisioningPlugin
@@ -62,6 +63,7 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.testing.Test
 import org.gradle.internal.os.OperatingSystem
+import org.gradle.jvm.toolchain.internal.LocationListInstallationSupplier.JAVA_INSTALLATIONS_PATHS_PROPERTY
 import org.gradle.kotlin.dsl.*
 import org.gradle.plugins.ide.eclipse.EclipsePlugin
 import org.gradle.plugins.ide.eclipse.model.EclipseModel
@@ -83,10 +85,10 @@ object Config {
     const val performanceTestResultsJsonName = "perf-results.json"
     const val performanceTestResultsJson = "performance-tests/$performanceTestResultsJsonName"
 
-    // Android Studio Iguana 2023.2.1.16 Canary 16
+    // Android Studio Jellyfish 2023.3.1
     // Find all references here https://developer.android.com/studio/archive
-    // Update verification-medata.xml
-    const val performanceTestAndroidStudioVersion = "2023.2.1.16"
+    // Update verification-metadata.xml
+    const val performanceTestAndroidStudioVersion = "2023.3.1.18"
     val performanceTestAndroidStudioJvmArgs = listOf("-Xms256m", "-Xmx4096m")
 }
 
@@ -147,7 +149,9 @@ class PerformanceTestPlugin : Plugin<Project> {
 
         val junit by configurations.creating
         dependencies {
-            "performanceTestImplementation"(project(":internal-performance-testing"))
+            if (project.name != "enterprise-plugin-performance") {
+                "performanceTestImplementation"(project(":internal-performance-testing"))
+            }
             junit("junit:junit:4.13")
         }
     }
@@ -232,6 +236,9 @@ class PerformanceTestPlugin : Plugin<Project> {
             inputs.files(performanceSourceSet.runtimeClasspath).withNormalizer(ClasspathNormalizer::class)
             inputs.file(performanceScenarioJson.absolutePath)
             inputs.file(tmpPerformanceScenarioJson.absolutePath)
+            project.toolchainInstallationPaths?.apply {
+                systemProperty(JAVA_INSTALLATIONS_PATHS_PROPERTY, this)
+            }
         }
     }
 
@@ -243,10 +250,14 @@ class PerformanceTestPlugin : Plugin<Project> {
             maxParallelForks = 1
             systemProperty("org.gradle.performance.scenario.json", outputJson.absolutePath)
 
+            project.toolchainInstallationPaths?.apply {
+                systemProperty(JAVA_INSTALLATIONS_PATHS_PROPERTY, this)
+            }
+
             outputs.cacheIf { false }
             outputs.file(outputJson)
 
-            predictiveSelection.enabled = false
+            develocity.predictiveTestSelection.enabled = false
         }
 
     private
@@ -397,7 +408,7 @@ class PerformanceTestExtension(
                 mustRunAfter(currentlyRegisteredTestProjects)
                 testSpecificConfigurator(this)
 
-                extensions.findByType<TestRetryExtension>()?.maxRetries = 0
+                extensions.findByType<DevelocityTestConfiguration>()?.testRetry?.maxRetries = 0
             }
         )
 
@@ -408,7 +419,7 @@ class PerformanceTestExtension(
                 description = "Runs performance tests on $testProject - supposed to be used on CI"
                 channel = "commits$channelSuffix"
 
-                extensions.findByType<TestRetryExtension>()?.maxRetries = 1
+                extensions.findByType<DevelocityTestConfiguration>()?.testRetry?.maxRetries = 1
 
                 if (project.includePerformanceTestScenarios) {
                     val scenariosFromFile = project.loadScenariosFromFile(testProject)

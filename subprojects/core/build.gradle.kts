@@ -1,5 +1,6 @@
 plugins {
     id("gradlebuild.distribution.api-java")
+    id("gradlebuild.instrumented-project")
 }
 
 description = "Public and internal 'core' Gradle APIs with implementation"
@@ -34,9 +35,7 @@ val testInterceptorsImplementation: Configuration by configurations.getting {
 
 errorprone {
     disabledChecks.addAll(
-        "BadImport", // 3 occurrences
         "BadInstanceof", // 6 occurrences (this is from generated code)
-        "BoxedPrimitiveEquality", // 3 occurrences
         "DefaultCharset", // 4 occurrences
         "EmptyBlockTag", // 4 occurrences
         "Finally", // 1 occurrences
@@ -48,7 +47,6 @@ errorprone {
         "InlineMeSuggester", // 1 occurrences
         "InvalidBlockTag", // 1 occurrences
         "InvalidInlineTag", // 1 occurrences
-        "InvalidLink", // 2 occurrences
         "MissingCasesInEnumSwitch", // 1 occurrences
         "MixedMutabilityReturnType", // 1 occurrences
         "ModifyCollectionInEnhancedForLoop", // 1 occurrences
@@ -64,12 +62,9 @@ errorprone {
         "SameNameButDifferent", // 11 occurrences
         "StreamResourceLeak", // 6 occurrences
         "StringCaseLocaleUsage", // 11 occurrences
-        "StringSplitter", // 2 occurrences
         "TypeParameterShadowing", // 1 occurrences
         "TypeParameterUnusedInFormals", // 2 occurrences
         "UndefinedEquals", // 1 occurrences
-        "UnnecessaryLambda", // 1 occurrences
-        "UnnecessaryParentheses", // 1 occurrences
         "UnrecognisedJavadocTag", // 1 occurrences
         "UnusedMethod", // 18 occurrences
         "UnusedVariable", // 8 occurrences
@@ -77,7 +72,12 @@ errorprone {
 }
 
 dependencies {
-    api(project(":base-annotations"))
+    api(projects.concurrent)
+    api(projects.instrumentationAgentServices)
+    api(projects.serialization)
+    api(projects.serviceProvider)
+    api(projects.stdlibJavaExtensions)
+    api(projects.time)
     api(project(":base-services"))
     api(project(":base-services-groovy"))
     api(project(":build-cache"))
@@ -89,6 +89,7 @@ dependencies {
     api(project(":build-option"))
     api(project(":cli"))
     api(project(":core-api"))
+    api(project(":declarative-dsl-api"))
     api(project(":enterprise-logging"))
     api(project(":enterprise-operations"))
     api(project(":execution"))
@@ -111,7 +112,8 @@ dependencies {
     api(project(":process-services"))
     api(project(":resources"))
     api(project(":snapshots"))
-    api(project(":worker-processes"))
+    api(project(":worker-main"))
+    api(project(":build-process-services"))
 
     api(libs.ant)
     api(libs.asm)
@@ -123,15 +125,15 @@ dependencies {
     api(libs.jsr305)
     api(libs.nativePlatform)
 
-    implementation(project(":core-jvm")) {
-        because("This is temporary, as ideally the core-jvm project would (optionally) depend on the core project.  This would require a base-core project, or some other common dep of both core and core-jvm to hold common code that is not yet created.")
-    }
+    implementation(projects.io)
+    implementation(project(":base-asm"))
     implementation(project(":input-tracking"))
     implementation(project(":model-groovy"))
 
     implementation(libs.asmCommons)
     implementation(libs.commonsIo)
     implementation(libs.commonsLang)
+    implementation(libs.errorProneAnnotations)
     implementation(libs.fastutil)
     implementation(libs.groovyAnt)
     implementation(libs.groovyJson)
@@ -144,7 +146,7 @@ dependencies {
     }
     implementation(libs.xmlApis)
 
-    compileOnly(libs.futureKotlin("stdlib")) {
+    compileOnly(libs.kotlinStdlib) {
         because("it needs to forward calls from instrumented code to the Kotlin standard library")
     }
 
@@ -219,6 +221,9 @@ dependencies {
     testFixturesApi(testFixtures(project(":snapshots"))) {
         because("test fixtures expose file snapshot related functionality")
     }
+    testFixturesApi(project(":unit-test-fixtures")) {
+        because("test fixtures expose ProjectBuilder")
+    }
     testFixturesImplementation(project(":build-option"))
     testFixturesImplementation(project(":enterprise-operations"))
     testFixturesImplementation(project(":messaging"))
@@ -248,6 +253,7 @@ dependencies {
 
     testImplementation(project(":dependency-management"))
 
+    testImplementation(testFixtures(projects.serialization))
     testImplementation(testFixtures(project(":core-api")))
     testImplementation(testFixtures(project(":messaging")))
     testImplementation(testFixtures(project(":model-core")))
@@ -260,8 +266,8 @@ dependencies {
     integTestImplementation(project(":workers"))
     integTestImplementation(project(":dependency-management"))
     integTestImplementation(project(":launcher"))
-    integTestImplementation(project(":plugins"))
     integTestImplementation(project(":war"))
+    integTestImplementation(project(":daemon-services"))
     integTestImplementation(libs.jansi)
     integTestImplementation(libs.jetbrainsAnnotations)
     integTestImplementation(libs.jetty)
@@ -270,8 +276,9 @@ dependencies {
     integTestImplementation(testFixtures(project(":file-temp")))
 
     testRuntimeOnly(project(":distributions-core")) {
-        because("ProjectBuilder tests load services from a Gradle distribution.")
+        because("This is required by ProjectBuilder, but ProjectBuilder cannot declare :distributions-core as a dependency due to conflicts with other distributions.")
     }
+
     integTestDistributionRuntimeOnly(project(":distributions-jvm")) {
         because("Some tests utilise the 'java-gradle-plugin' and with that TestKit, some also use the 'war' plugin")
     }
@@ -302,10 +309,9 @@ tasks.compileTestGroovy {
     groovyOptions.fork("memoryInitialSize" to "128M", "memoryMaximumSize" to "1G")
 }
 
+tasks.isolatedProjectsIntegTest {
+    enabled = true
+}
+
 integTest.usesJavadocCodeSnippets = true
 testFilesCleanup.reportOnly = true
-
-// Remove as part of fixing https://github.com/gradle/configuration-cache/issues/585
-tasks.configCacheIntegTest {
-    systemProperties["org.gradle.configuration-cache.internal.test-disable-load-after-store"] = "true"
-}

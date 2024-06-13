@@ -8,7 +8,7 @@ dependencies {
     api(project(":snapshots"))
     api(project(":build-operations"))
     api(project(":files"))
-    api(project(":base-annotations"))
+    api(projects.stdlibJavaExtensions)
 
     api(libs.jsr305)
     api(libs.nativePlatform)
