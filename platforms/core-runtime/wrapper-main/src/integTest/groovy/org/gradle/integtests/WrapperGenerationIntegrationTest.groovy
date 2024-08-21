@@ -35,7 +35,7 @@ import java.util.jar.Manifest
 import static org.hamcrest.CoreMatchers.containsString
 
 class WrapperGenerationIntegrationTest extends AbstractIntegrationSpec {
-    private static final HashCode EXPECTED_WRAPPER_JAR_HASH = HashCode.fromString("498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17")
+    private static final HashCode EXPECTED_WRAPPER_JAR_HASH = HashCode.fromString("2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046")
 
     def "generated wrapper scripts use correct line separators"() {
         buildFile << """
@@ -91,6 +91,9 @@ class WrapperGenerationIntegrationTest extends AbstractIntegrationSpec {
         file("gradle/wrapper/gradle-wrapper.properties").text.contains("distributionUrl=https\\://services.gradle.org/distributions/gradle-2.2.1-bin.zip")
     }
 
+    // NOTE: this test will fail on any changes to wrapper code
+    // If your changes do relate to wrapper, just change the hash.
+    // Otherwise, investigate.
     def "generated wrapper files are reproducible"() {
         when:
         executer.inDirectory(file("first")).withTasks("wrapper").run()

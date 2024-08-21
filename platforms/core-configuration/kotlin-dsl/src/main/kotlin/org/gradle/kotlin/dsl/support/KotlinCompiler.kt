@@ -58,7 +58,7 @@ import org.jetbrains.kotlin.config.JvmClosureGenerationScheme
 import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.JvmTarget.JVM_1_8
-import org.jetbrains.kotlin.config.JvmTarget.JVM_21
+import org.jetbrains.kotlin.config.JvmTarget.JVM_22
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
@@ -89,6 +89,7 @@ import kotlin.script.experimental.jvm.JvmDependency
 import kotlin.script.experimental.jvm.JvmGetScriptingClass
 
 
+@Suppress("LongParameterList")
 fun compileKotlinScriptModuleTo(
     outputDirectory: File,
     compilerOptions: KotlinCompilerOptions,
@@ -375,7 +376,7 @@ fun JavaVersion.toKotlinJvmTarget(): JvmTarget {
     // JvmTarget.fromString(JavaVersion.majorVersion) works from Java 9 to Java 21
     return JvmTarget.fromString(majorVersion)
         ?: if (this <= JavaVersion.VERSION_1_8) JVM_1_8
-        else JVM_21
+        else JVM_22
 }
 
 
@@ -387,7 +388,7 @@ fun gradleKotlinDslLanguageVersionSettingsFor(compilerOptions: KotlinCompilerOpt
         AnalysisFlags.skipMetadataVersionCheck to compilerOptions.skipMetadataVersionCheck,
         AnalysisFlags.skipPrereleaseCheck to true,
         AnalysisFlags.allowUnstableDependencies to true,
-        JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ENABLE,
+        JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ALL,
     ),
     specificFeatures = mapOf(
         LanguageFeature.DisableCompatibilityModeForNewInference to LanguageFeature.State.ENABLED,
@@ -502,7 +503,7 @@ data class ScriptCompilationException(private val scriptCompilationErrors: List<
         return "Line ${lineNumber(location)}: ${location.lineContent}\n" +
             "^ $message".lines().joinToString(
                 prefix = columnIndent,
-                separator = "\n$columnIndent  $indent"
+                separator = "\n$columnIndent  $INDENT"
             )
     }
 
@@ -511,7 +512,7 @@ data class ScriptCompilationException(private val scriptCompilationErrors: List<
         location.line.toString().padStart(maxLineNumberStringLength, '0')
 
     private
-    fun prependIndent(it: String) = it.prependIndent(indent)
+    fun prependIndent(it: String) = it.prependIndent(INDENT)
 
     private
     val errorPlural
@@ -525,7 +526,7 @@ data class ScriptCompilationException(private val scriptCompilationErrors: List<
 
 
 private
-const val indent = "  "
+const val INDENT = "  "
 
 
 private

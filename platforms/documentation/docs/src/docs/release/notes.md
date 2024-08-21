@@ -8,13 +8,14 @@ Include only their name, impactful features should be called out separately belo
 
  THIS LIST SHOULD BE ALPHABETIZED BY [PERSON NAME] - the docs:updateContributorsInReleaseNotes task will enforce this ordering, which is case-insensitive.
 -->
+
 We would like to thank the following community members for their contributions to this release of Gradle:
 
 Be sure to check out the [public roadmap](https://blog.gradle.org/roadmap-announcement) for insight into what's planned for future releases.
 
 ## Upgrade instructions
 
-Switch your build to use Gradle @version@ by updating your wrapper:
+Switch your build to use Gradle @version@ by updating the [Wrapper](userguide/gradle_wrapper.html) in your project:
 
 `./gradlew wrapper --gradle-version=@version@`
 
@@ -52,7 +53,14 @@ Example:
 ADD RELEASE FEATURES BELOW
 vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv -->
 
+<a name="native-plugin-improvements"></a>
+### Swift and C++ plugin improvements
 
+#### Configuration cache compatibility
+
+The Swift and C++ plugins are now configuration cache compatible.
+
+The `cpp-unit` and `xctest` plugins are not yet compatible.
 
 <!-- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ADD RELEASE FEATURES ABOVE

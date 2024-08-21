@@ -23,6 +23,9 @@ import java.lang.annotation.Target;
 
 /**
  * Marks that a property will be replaced with a lazy property.
+ * This is a complementary annotation to {@link NotToBeReplacedByLazyProperty}.
+ *
+ * This annotation is internal even though it's attached to a public API, so it should not be referenced in third-party code.
  */
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.METHOD})
@@ -37,4 +40,9 @@ public @interface ToBeReplacedByLazyProperty {
      * Link to a GitHub issue if it exists.
      */
     String issue() default "";
+
+    /**
+     * If true property will be not be reported in the upgrade report.
+     */
+    boolean unreported() default false;
 }

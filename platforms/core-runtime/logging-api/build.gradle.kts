@@ -26,4 +26,5 @@ dependencies {
     api(libs.slf4jApi)
 
     implementation(projects.stdlibJavaExtensions)
+    implementation(projects.internalInstrumentationApi)
 }

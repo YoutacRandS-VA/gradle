@@ -46,7 +46,7 @@ import java.util.zip.ZipFile;
 /**
  * Determines the classpath for a module by looking for a '${module}-classpath.properties' resource with 'name' set to the name of the module.
  */
-public class DefaultModuleRegistry implements ModuleRegistry {
+public class DefaultModuleRegistry implements ModuleRegistry, GlobalCacheRootsProvider {
     private static final Spec<File> SATISFY_ALL = element -> true;
     private static final List<String> JARS_REPLACED_BY_TD_PLUGIN = createJarsReplacedByTdPlugin();
 
@@ -110,6 +110,7 @@ public class DefaultModuleRegistry implements ModuleRegistry {
             : Optional.empty();
     }
 
+    @Override
     public List<File> getGlobalCacheRoots() {
         ImmutableList.Builder<File> builder = ImmutableList.builder();
         if (gradleInstallation != null) {
@@ -268,7 +269,8 @@ public class DefaultModuleRegistry implements ModuleRegistry {
      * <li>In Eclipse, they are in the bin/ folder.</li>
      * <li>In IDEA (native import), they are in the out/production/ folder.</li>
      * </ul>
-     * <li>In both cases we also include the static and generated resources of the project.</li>
+     *
+     * In both cases we also include the static and generated resources of the project.
      */
     private List<String> getClasspathSuffixesForProjectDir(String projectDirName) {
         List<String> suffixes = new ArrayList<>();

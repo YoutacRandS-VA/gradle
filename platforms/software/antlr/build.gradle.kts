@@ -1,5 +1,6 @@
 plugins {
     id("gradlebuild.distribution.api-java")
+    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Adds support for generating parsers from Antlr grammars."
@@ -13,17 +14,17 @@ errorprone {
 
 dependencies {
     api(projects.stdlibJavaExtensions)
-    api(project(":core"))
-    api(project(":core-api"))
-    api(project(":files"))
-    api(project(":model-core"))
+    api(projects.core)
+    api(projects.coreApi)
+    api(projects.files)
+    api(projects.modelCore)
 
     api(libs.inject)
 
-    implementation(project(":base-services"))
-    implementation(project(":platform-jvm"))
-    implementation(project(":plugins-java-base"))
-    implementation(project(":plugins-java-library"))
+    implementation(projects.baseServices)
+    implementation(projects.platformJvm)
+    implementation(projects.pluginsJavaBase)
+    implementation(projects.pluginsJavaLibrary)
 
     implementation(libs.guava)
     implementation(libs.jsr305)
@@ -33,17 +34,17 @@ dependencies {
         because("this dependency is downloaded by the antlr plugin")
     }
 
-    runtimeOnly(project(":language-jvm"))
-    runtimeOnly(project(":workers"))
+    runtimeOnly(projects.languageJvm)
+    runtimeOnly(projects.workers)
 
-    testImplementation(project(":base-services-groovy"))
-    testImplementation(testFixtures(project(":core")))
-    testImplementation(project(":file-collections"))
+    testImplementation(projects.baseServicesGroovy)
+    testImplementation(testFixtures(projects.core))
+    testImplementation(projects.fileCollections)
 
-    testRuntimeOnly(project(":distributions-core")) {
+    testRuntimeOnly(projects.distributionsCore) {
         because("ProjectBuilder tests load services from a Gradle distribution.")
     }
-    integTestDistributionRuntimeOnly(project(":distributions-full"))
+    integTestDistributionRuntimeOnly(projects.distributionsFull)
 }
 
 packageCycles {

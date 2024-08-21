@@ -26,8 +26,8 @@ import org.gradle.api.internal.artifacts.dsl.dependencies.ProjectFinder;
 import org.gradle.api.internal.artifacts.dsl.dependencies.UnknownProjectFinder;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FileResolver;
-import org.gradle.api.internal.initialization.RootScriptDomainObjectContext;
 import org.gradle.api.internal.initialization.ScriptClassPathResolver;
+import org.gradle.api.internal.initialization.StandaloneDomainObjectContext;
 import org.gradle.api.internal.plugins.PluginInspector;
 import org.gradle.api.internal.plugins.software.SoftwareType;
 import org.gradle.api.internal.tasks.properties.InspectionScheme;
@@ -39,6 +39,7 @@ import org.gradle.internal.event.ListenerManager;
 import org.gradle.internal.instantiation.InstantiationScheme;
 import org.gradle.internal.instantiation.InstantiatorFactory;
 import org.gradle.internal.properties.annotations.MissingPropertyAnnotationHandler;
+import org.gradle.internal.properties.annotations.PropertyAnnotationHandler;
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.service.Provides;
 import org.gradle.internal.service.ServiceRegistration;
@@ -53,7 +54,10 @@ import org.gradle.plugin.management.internal.autoapply.AutoAppliedPluginRegistry
 import org.gradle.plugin.management.internal.autoapply.CompositeAutoAppliedPluginRegistry;
 import org.gradle.plugin.management.internal.autoapply.DefaultAutoAppliedPluginHandler;
 import org.gradle.plugin.management.internal.autoapply.InjectedAutoAppliedPluginRegistry;
+import org.gradle.plugin.software.internal.DefaultModelDefaultsApplicator;
 import org.gradle.plugin.software.internal.DefaultSoftwareTypeRegistry;
+import org.gradle.plugin.software.internal.ModelDefaultsApplicator;
+import org.gradle.plugin.software.internal.ModelDefaultsHandler;
 import org.gradle.plugin.software.internal.PluginScheme;
 import org.gradle.plugin.software.internal.SoftwareTypeAnnotationHandler;
 import org.gradle.plugin.software.internal.SoftwareTypeRegistry;
@@ -91,7 +95,7 @@ public class PluginUseServices extends AbstractGradleModuleServices {
     @NonNullApi
     private static class GlobalScopeServices implements ServiceRegistrationProvider {
         @Provides
-        SoftwareTypeAnnotationHandler createSoftwareTypeAnnotationHandler() {
+        PropertyAnnotationHandler createSoftwareTypeAnnotationHandler() {
             return new SoftwareTypeAnnotationHandler();
         }
     }
@@ -110,6 +114,7 @@ public class PluginUseServices extends AbstractGradleModuleServices {
     }
 
     private static class BuildScopeServices implements ServiceRegistrationProvider {
+        @Provides
         void configure(ServiceRegistration registration) {
             registration.add(PluginResolverFactory.class);
             registration.add(DefaultPluginRequestApplicator.class);
@@ -129,6 +134,11 @@ public class PluginUseServices extends AbstractGradleModuleServices {
         @Provides
         SoftwareTypeRegistry createSoftwareTypeRegistry(PluginScheme pluginScheme) {
             return new DefaultSoftwareTypeRegistry(pluginScheme.getInspectionScheme());
+        }
+
+        @Provides
+        ModelDefaultsApplicator createSoftwareTypeConventionApplicator(SoftwareTypeRegistry softwareTypeRegistry, List<ModelDefaultsHandler> modelDefaultsHandlers) {
+            return new DefaultModelDefaultsApplicator(softwareTypeRegistry, modelDefaultsHandlers);
         }
 
         @Provides
@@ -202,7 +212,7 @@ public class PluginUseServices extends AbstractGradleModuleServices {
             return new Factory<DependencyResolutionServices>() {
                 @Override
                 public DependencyResolutionServices create() {
-                    return dependencyManagementServices.create(fileResolver, fileCollectionFactory, dependencyMetaDataProvider, makeUnknownProjectFinder(), RootScriptDomainObjectContext.PLUGINS);
+                    return dependencyManagementServices.create(fileResolver, fileCollectionFactory, dependencyMetaDataProvider, makeUnknownProjectFinder(), StandaloneDomainObjectContext.PLUGINS);
                 }
             };
         }

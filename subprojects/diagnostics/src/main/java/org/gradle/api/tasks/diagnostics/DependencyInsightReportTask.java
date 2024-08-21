@@ -63,6 +63,7 @@ import org.gradle.api.tasks.diagnostics.internal.text.StyledTable;
 import org.gradle.api.tasks.options.Option;
 import org.gradle.initialization.StartParameterBuildOptions;
 import org.gradle.internal.graph.GraphRenderer;
+import org.gradle.internal.instrumentation.api.annotations.ToBeReplacedByLazyProperty;
 import org.gradle.internal.logging.text.StyledTextOutput;
 import org.gradle.internal.logging.text.StyledTextOutputFactory;
 import org.gradle.internal.typeconversion.NotationParser;
@@ -183,6 +184,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
      * Selects the dependency (or dependencies if multiple matches found) to show the report for.
      */
     @Internal
+    @ToBeReplacedByLazyProperty(comment = "Should Spec<?> be lazy?")
     public @Nullable Spec<DependencyResult> getDependencySpec() {
         return dependencySpec;
     }
@@ -217,6 +219,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
      * Configuration to look the dependency in
      */
     @Internal
+    @ToBeReplacedByLazyProperty
     public @Nullable Configuration getConfiguration() {
         return configuration;
     }
@@ -249,6 +252,7 @@ public abstract class DependencyInsightReportTask extends DefaultTask {
      * @since 4.9
      */
     @Internal
+    @ToBeReplacedByLazyProperty
     public boolean isShowSinglePathToDependency() {
         return showSinglePathToDependency;
     }

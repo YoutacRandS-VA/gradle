@@ -49,7 +49,6 @@ import org.gradle.api.internal.CollectionCallbackActionDecorator;
 import org.gradle.api.internal.DomainObjectContext;
 import org.gradle.api.internal.DynamicObjectAware;
 import org.gradle.api.internal.GradleInternal;
-import org.gradle.api.internal.MutationGuards;
 import org.gradle.api.internal.ProcessOperations;
 import org.gradle.api.internal.artifacts.DependencyManagementServices;
 import org.gradle.api.internal.artifacts.DependencyResolutionServices;
@@ -103,10 +102,11 @@ import org.gradle.internal.model.ModelContainer;
 import org.gradle.internal.model.RuleBasedPluginListener;
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.resource.TextUriResourceLoader;
-import org.gradle.internal.service.DefaultServiceRegistry;
+import org.gradle.internal.service.CloseableServiceRegistry;
 import org.gradle.internal.service.Provides;
 import org.gradle.internal.service.ServiceRegistrationProvider;
 import org.gradle.internal.service.ServiceRegistry;
+import org.gradle.internal.service.ServiceRegistryBuilder;
 import org.gradle.internal.service.scopes.ServiceRegistryFactory;
 import org.gradle.internal.typeconversion.TypeConverter;
 import org.gradle.listener.ClosureBackedMethodInvocationDispatch;
@@ -459,10 +459,10 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     public Object getGroup() {
         if (group != null) {
             return group;
-        } else if (this == rootProject) {
+        } else if (this.equals(rootProject)) {
             return "";
         }
-        group = rootProject.getName() + (getParent() == rootProject ? "" : "." + getParent().getPath().substring(1).replace(':', '.'));
+        group = rootProject.getName() + (getParent().equals(rootProject) ? "" : "." + getParent().getPath().substring(1).replace(':', '.'));
         return group;
     }
 
@@ -510,7 +510,12 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     @Override
     public Map<String, Project> getChildProjects() {
-        return getCrossProjectModelAccess().getChildProjects(this, this);
+        return getChildProjects(this);
+    }
+
+    @Override
+    public Map<String, Project> getChildProjects(ProjectInternal referrer) {
+        return getCrossProjectModelAccess().getChildProjects(referrer, this);
     }
 
     @Override
@@ -602,9 +607,14 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     }
 
     @Override
-    @Nonnull
     public Path getProjectPath() {
         return owner.getProjectPath();
+    }
+
+    @Nonnull
+    @Override
+    public ProjectIdentity getProjectIdentity() {
+        return owner.getIdentity();
     }
 
     @Override
@@ -689,7 +699,7 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     @Override
     public void allprojects(ProjectInternal referrer, Action<? super Project> action) {
-        getProjectConfigurator().allprojects(getCrossProjectModelAccess().getAllprojects(referrer, this), action);
+        getProjectConfigurator().allprojects(getAllprojects(referrer), action);
     }
 
     @Override
@@ -714,7 +724,7 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     @Override
     public void subprojects(ProjectInternal referrer, Action<? super Project> configureAction) {
-        getProjectConfigurator().subprojects(getCrossProjectModelAccess().getSubprojects(referrer, this), configureAction);
+        getProjectConfigurator().subprojects(getSubprojects(referrer), configureAction);
     }
 
     @Override
@@ -1033,26 +1043,26 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
     @Override
     public void beforeEvaluate(Action<? super Project> action) {
-        assertMutatingMethodAllowed("beforeEvaluate(Action)");
+        assertEagerContext("beforeEvaluate(Action)");
         evaluationListener.add("beforeEvaluate", getListenerBuildOperationDecorator().decorate("Project.beforeEvaluate", action));
     }
 
     @Override
     public void afterEvaluate(Action<? super Project> action) {
-        assertMutatingMethodAllowed("afterEvaluate(Action)");
+        assertEagerContext("afterEvaluate(Action)");
         failAfterProjectIsEvaluated("afterEvaluate(Action)");
         evaluationListener.add("afterEvaluate", getListenerBuildOperationDecorator().decorate("Project.afterEvaluate", action));
     }
 
     @Override
     public void beforeEvaluate(Closure closure) {
-        assertMutatingMethodAllowed("beforeEvaluate(Closure)");
+        assertEagerContext("beforeEvaluate(Closure)");
         evaluationListener.add(new ClosureBackedMethodInvocationDispatch("beforeEvaluate", getListenerBuildOperationDecorator().decorate("Project.beforeEvaluate", Cast.<Closure<?>>uncheckedNonnullCast(closure))));
     }
 
     @Override
     public void afterEvaluate(Closure closure) {
-        assertMutatingMethodAllowed("afterEvaluate(Closure)");
+        assertEagerContext("afterEvaluate(Closure)");
         failAfterProjectIsEvaluated("afterEvaluate(Closure)");
         evaluationListener.add(new ClosureBackedMethodInvocationDispatch("afterEvaluate", getListenerBuildOperationDecorator().decorate("Project.afterEvaluate", Cast.<Closure<?>>uncheckedNonnullCast(closure))));
     }
@@ -1205,10 +1215,6 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     public ServiceRegistryFactory getServiceRegistryFactory() {
         return services.get(ServiceRegistryFactory.class);
     }
-
-    @Inject
-    @Override
-    public abstract DependencyMetaDataProvider getDependencyMetaDataProvider();
 
     @Override
     public AntBuilder ant(Closure configureClosure) {
@@ -1465,8 +1471,12 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
             : nextBatch.getSource();
     }
 
-    private void assertMutatingMethodAllowed(String methodName) {
-        MutationGuards.of(getProjectConfigurator()).assertMutationAllowed(methodName, this, Project.class);
+    /**
+     * Assert that the current thread is not running a lazy action on a domain object within this project.
+     *  This method should be called by methods that must not be called in lazy actions.
+     */
+    private void assertEagerContext(String methodName) {
+        getProjectConfigurator().getLazyBehaviorGuard().assertEagerContext(methodName, this, Project.class);
     }
 
     @Override
@@ -1478,19 +1488,28 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
     public DetachedResolver newDetachedResolver() {
         DependencyManagementServices dms = getServices().get(DependencyManagementServices.class);
         InstantiatorFactory instantiatorFactory = services.get(InstantiatorFactory.class);
-        DefaultServiceRegistry lookup = new DefaultServiceRegistry(services);
-        lookup.addProvider(new ServiceRegistrationProvider() {
-            @Provides
-            public DependencyResolutionServices createServices() {
-                return dms.create(
-                    services.get(FileResolver.class),
-                    services.get(FileCollectionFactory.class),
-                    services.get(DependencyMetaDataProvider.class),
-                    new UnknownProjectFinder("Detached resolvers do not support resolving projects"),
-                    new DetachedDependencyResolutionDomainObjectContext(services.get(DomainObjectContext.class))
-                );
-            }
-        });
+        CloseableServiceRegistry lookup = ServiceRegistryBuilder.builder()
+            .displayName("detached resolver services")
+            .parent(services)
+            .provider(new ServiceRegistrationProvider() {
+                @Provides
+                public DependencyResolutionServices createDependencyResolutionServices(
+                    FileResolver fileResolver,
+                    FileCollectionFactory fileCollectionFactory,
+                    DependencyMetaDataProvider dependencyMetaDataProvider,
+                    DomainObjectContext domainObjectContext
+                ) {
+                    return dms.create(
+                        fileResolver,
+                        fileCollectionFactory,
+                        dependencyMetaDataProvider,
+                        new UnknownProjectFinder("Detached resolvers do not support resolving projects"),
+                        new DetachedDependencyResolutionDomainObjectContext(domainObjectContext)
+                    );
+                }
+            })
+            .build();
+
         return instantiatorFactory.decorate(lookup).newInstance(
             LocalDetachedResolver.class
         );
@@ -1539,14 +1558,14 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
 
         @Override
         @Nullable
-        public Path getProjectPath() {
-            return delegate.getProjectPath();
-        }
-
-        @Override
-        @Nullable
         public ProjectInternal getProject() {
             return delegate.getProject();
+        }
+
+        @Nullable
+        @Override
+        public ProjectIdentity getProjectIdentity() {
+            return delegate.getProjectIdentity();
         }
 
         @Override
@@ -1577,6 +1596,11 @@ public abstract class DefaultProject extends AbstractPluginAware implements Proj
         @Override
         public boolean isDetachedState() {
             return true;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "detached context of " + delegate.getDisplayName();
         }
     }
 }

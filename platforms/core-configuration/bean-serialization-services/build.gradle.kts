@@ -26,13 +26,16 @@ dependencies {
     api(projects.stdlibJavaExtensions)
     api(projects.modelCore)
     api(projects.persistentCache)
+    api(projects.serviceProvider)
 
     api(libs.kotlinStdlib)
 
-    implementation(projects.baseServices)
+    implementation(projects.baseAsm)
     implementation(projects.configurationProblemsBase)
     implementation(projects.core)
     implementation(projects.coreApi)
+    implementation(projects.coreKotlinExtensions)
+    implementation(projects.serviceLookup)
     implementation(projects.stdlibKotlinExtensions)
 
     implementation(libs.groovy)

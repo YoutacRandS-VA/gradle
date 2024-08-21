@@ -24,6 +24,7 @@ import gradlebuild.basics.BuildEnvironment.isTravis
 import gradlebuild.basics.buildBranch
 import gradlebuild.basics.environmentVariable
 import gradlebuild.basics.isPromotionBuild
+import gradlebuild.basics.isRetryBuild
 import gradlebuild.basics.kotlindsl.execAndGetStdoutIgnoringError
 import gradlebuild.basics.logicalBranch
 import gradlebuild.basics.predictiveTestSelectionEnabled
@@ -62,19 +63,26 @@ inline fun buildScan(configure: BuildScanConfiguration.() -> Unit) {
 }
 
 extractCiData()
-
-if (project.testDistributionEnabled) {
-    buildScan?.tag("TEST_DISTRIBUTION")
-}
-
-if (project.predictiveTestSelectionEnabled.orNull == true) {
-    buildScan?.tag("PTS")
-}
-
 extractWatchFsData()
 
-if (logicalBranch.orNull != buildBranch.orNull) {
-    buildScan?.tag("PRE_TESTED_COMMIT")
+buildScan {
+    val testDistributionEnabled = project.testDistributionEnabled
+    val predictiveTestSelectionEnabled = project.predictiveTestSelectionEnabled
+    val logicalBranch = project.logicalBranch
+    val buildBranch = project.buildBranch
+
+    // TODO(https://github.com/gradle/gradle/issues/25474) background would be better, but it makes branch an input to CC because of the bug.
+    buildFinished {
+        if (testDistributionEnabled) {
+            tag("TEST_DISTRIBUTION")
+        }
+        if (predictiveTestSelectionEnabled.getOrElse(false)) {
+            tag("PTS")
+        }
+        if (logicalBranch.orNull != buildBranch.orNull) {
+            tag("PRE_TESTED_COMMIT")
+        }
+    }
 }
 
 if ((project.gradle as GradleInternal).services.get(BuildType::class.java) != BuildType.TASKS) {
@@ -114,7 +122,7 @@ fun Project.extractCiData() {
             }
             buildFinished {
                 println("##teamcity[setParameter name='env.GRADLE_RUNNER_FINISHED' value='true']")
-                if (failures.isEmpty()) {
+                if (failures.isEmpty() && isRetryBuild) {
                     println("##teamcity[buildStatus status='SUCCESS' text='Retried build succeeds']")
                 }
             }
@@ -138,11 +146,9 @@ fun Project.extractWatchFsData() {
 
 open class FileSystemWatchingBuildOperationListener(private val buildOperationListenerManager: BuildOperationListenerManager, private val buildScan: BuildScanConfiguration) : BuildOperationListener {
 
-    override fun started(buildOperation: BuildOperationDescriptor, startEvent: OperationStartEvent) {
-    }
+    override fun started(buildOperation: BuildOperationDescriptor, startEvent: OperationStartEvent) = Unit
 
-    override fun progress(operationIdentifier: OperationIdentifier, progressEvent: OperationProgressEvent) {
-    }
+    override fun progress(operationIdentifier: OperationIdentifier, progressEvent: OperationProgressEvent) = Unit
 
     override fun finished(buildOperation: BuildOperationDescriptor, finishEvent: OperationFinishEvent) {
         when (val result = finishEvent.result) {

@@ -4,25 +4,15 @@ plugins {
 
 description = "Process execution abstractions."
 
-gradlebuildJava.usedInWorkers()
-
 dependencies {
     api(projects.concurrent)
     api(projects.stdlibJavaExtensions)
-    api(project(":base-services"))
-    api(project(":messaging"))
-
+    api(projects.baseServices)
     api(libs.jsr305)
 
-    implementation(project(":native"))
+    testImplementation(testFixtures(projects.core))
 
-    implementation(libs.slf4jApi)
-    implementation(libs.guava)
-    implementation(libs.nativePlatform)
-
-    testImplementation(testFixtures(project(":core")))
-
-    integTestDistributionRuntimeOnly(project(":distributions-core"))
+    integTestDistributionRuntimeOnly(projects.distributionsCore)
 }
 
 packageCycles {

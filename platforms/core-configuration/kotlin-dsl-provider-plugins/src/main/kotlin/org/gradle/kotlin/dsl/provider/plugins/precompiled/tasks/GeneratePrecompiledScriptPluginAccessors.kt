@@ -33,7 +33,7 @@ import org.gradle.api.internal.artifacts.dsl.dependencies.DependencyFactoryInter
 import org.gradle.api.internal.artifacts.dsl.dependencies.UnknownProjectFinder
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.FileResolver
-import org.gradle.api.internal.initialization.RootScriptDomainObjectContext
+import org.gradle.api.internal.initialization.StandaloneDomainObjectContext
 import org.gradle.api.internal.initialization.ScriptClassPathResolver
 import org.gradle.api.internal.project.ProjectInternal
 import org.gradle.api.internal.project.ProjectStateRegistry
@@ -94,7 +94,7 @@ import javax.inject.Inject
 
 
 internal
-const val strictModeSystemPropertyName = "org.gradle.kotlin.dsl.precompiled.accessors.strict"
+const val STRICT_MODE_SYSTEM_PROPERTY_NAME = "org.gradle.kotlin.dsl.precompiled.accessors.strict"
 
 
 @CacheableTask
@@ -287,7 +287,8 @@ abstract class GeneratePrecompiledScriptPluginAccessors @Inject internal constru
     private
     fun validationErrorFor(pluginRequest: PluginRequestInternal): String? {
         if (pluginRequest.version != null) {
-            return "Invalid plugin request $pluginRequest. Plugin requests from precompiled scripts must not include a version number. Please remove the version from the offending request and make sure the module containing the requested plugin '${pluginRequest.id}' is an implementation dependency of $projectDesc."
+            return "Invalid plugin request $pluginRequest. Plugin requests from precompiled scripts must not include a version number. " +
+                "Please remove the version from the offending request and make sure the module containing the requested plugin '${pluginRequest.id}' is an implementation dependency of $projectDesc."
         }
         // TODO:kotlin-dsl validate apply false
         return null
@@ -442,7 +443,7 @@ abstract class GeneratePrecompiledScriptPluginAccessors @Inject internal constru
             fileCollectionFactory,
             gradle.serviceOf<DependencyMetaDataProvider>(),
             UnknownProjectFinder("Project dependencies are not allowed at GeneratePrecompiledScriptPluginAccessors resolution"),
-            RootScriptDomainObjectContext.PLUGINS
+            StandaloneDomainObjectContext.PLUGINS
         )
 
         val dependencies = dependencyResolutionServices.dependencyHandler
@@ -476,6 +477,7 @@ abstract class GeneratePrecompiledScriptPluginAccessors @Inject internal constru
                 }
             }
         }.toTypedArray()
+        @Suppress("SpreadOperator")
         return configurations.detachedConfiguration(*dependencies)
     }
 

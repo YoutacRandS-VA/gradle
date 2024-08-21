@@ -21,7 +21,7 @@ import org.gradle.internal.cc.impl.AbstractConfigurationCacheIntegrationTest
 
 class ConfigurationCacheProblemsServiceIntegTest extends AbstractConfigurationCacheIntegrationTest {
 
-    public static final String REGISTRATION_UNSUPPORTED = 'validation:configuration-cache-registration-of-listener-on-gradle-buildfinished-is-unsupported'
+    public static final String REGISTRATION_UNSUPPORTED = 'validation:configuration-cache:registration-of-listener-on-gradle-buildfinished-is-unsupported'
 
     @Override
     def setup() {
@@ -52,12 +52,13 @@ class ConfigurationCacheProblemsServiceIntegTest extends AbstractConfigurationCa
             fqid == REGISTRATION_UNSUPPORTED
             contextualLabel == "registration of listener on 'Gradle.buildFinished' is unsupported"
             definition.severity == Severity.WARNING
-            definition.documentationLink != null
+            definition.documentationLink.url.endsWith("/userguide/configuration_cache.html#config_cache:requirements:build_listeners")
             locations.size() == 2
             locations[0].path == "build file 'build.gradle'"
             locations[0].line == 2
             locations[1].path == "build file '${buildFile.absolutePath}'"
             locations[1].line == 2
+            additionalData.asMap.trace == "build file 'build.gradle': line 2"
         }
 
         when:
@@ -68,7 +69,13 @@ class ConfigurationCacheProblemsServiceIntegTest extends AbstractConfigurationCa
             fqid == REGISTRATION_UNSUPPORTED
             contextualLabel == "registration of listener on 'Gradle.buildFinished' is unsupported"
             definition.severity == Severity.WARNING
-            definition.documentationLink != null
+            definition.documentationLink.url.endsWith("/userguide/configuration_cache.html#config_cache:requirements:build_listeners")
+            locations[0].path == "build file 'build.gradle'"
+            locations[0].line == 2
+            locations[1].path == "build file '${buildFile.absolutePath}'"
+            locations[1].line == 2
+            additionalData.asMap.trace == "build file 'build.gradle': line 2"
+
         }
     }
 
@@ -107,7 +114,7 @@ class ConfigurationCacheProblemsServiceIntegTest extends AbstractConfigurationCa
 
         then:
         verifyAll(receivedProblem) {
-            fqid == 'validation:configuration-cache-invocation-of-task-project-at-execution-time-is-unsupported'
+            fqid == 'validation:configuration-cache:invocation-of-task-project-at-execution-time-is-unsupported'
             contextualLabel == "invocation of 'Task.project' at execution time is unsupported."
             definition.severity == Severity.ADVICE
         }
